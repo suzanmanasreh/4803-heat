@@ -8,7 +8,6 @@
 using namespace std;
 
 int main() {
-    string vtk_str = "# vtk DataFile Version 3.0\nvtk output\nASCII\nDATASET RECTILINEAR_GRID\nDIMENSIONS 6 2 1\nX_COORDINATES 6 float\n0 1 2 3 4 5\nY_COORDINATES 2 float\n0 1\nZ_COORDINATES 1 float\n0\nCELL_DATA 5\nSCALARS temp float 1\nLOOKUP_TABLE default\n";
     float init_inner = 10;
     float init_border = 0;
 
@@ -16,30 +15,45 @@ int main() {
     float curr_time = init_time;
     float dt = .1;
     float L = 5;
-    float dx = .2;
+    float dx = 1;
     int x_dim = (int) (L / dx);
-    int num_steps = 20;
+    int num_steps = 21;
     // heat coeff
     float alpha = 1;
+    float w_out = 1;
+    float writes = 0;
 
     vector<float> x_vals(x_dim + 2, init_inner);
     x_vals[0] = init_border;
     x_vals[x_dim + 1] = init_border;
 
+    ofstream file("data.csv");
+    file << "x,";
+    for (int j = 1; j < (x_dim + 1); j++) {
+        file << j << ",";
+    }
+    file << endl;
+
     for (int i = 0; i < num_steps; i++) {
-        char str[20]; // = format("examples/ex_%04d.vtk", i);
-        sprintf(str, "examples/ex_%04d.vtk", i);
-        printf("%f,", curr_time);
-        ofstream file(str);
-        file << vtk_str;
+        if (abs(curr_time - (w_out * writes)) < .0001) {
+            printf("%f,", curr_time);
+            file << curr_time << ",";
+        }
         for (int j = 1; j < (x_dim + 1); j++) {
-            file << x_vals[j] << " ";
-            printf("%f, ", x_vals[j]);
+            if (abs(curr_time - (w_out * writes)) < .0001) {
+                file << x_vals[j];
+                printf("%f, ", x_vals[j]);
+                if (j != x_dim) {
+                    file << ",";
+                } else {
+                    writes++;
+                    printf("\n");
+                    file << "\n";
+                }
+            }
             x_vals[j] += ((alpha * dt) / (dx*dx)) * (x_vals[j - 1] - (2 * x_vals[j]) + x_vals[j + 1]);
         }
-        printf("\n");
         curr_time += dt;
-        // printf("7\n");
-        file.close();
     }
+    file.close();
 }
