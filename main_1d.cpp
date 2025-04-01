@@ -4,6 +4,7 @@
 #include <fstream>
 #include <stdio.h>
 #include <string>
+#include <cmath>
 
 using namespace std;
 
@@ -15,22 +16,27 @@ int main() {
     float curr_time = init_time;
     float dt = .1;
     float L = 5;
-    float dx = 1;
+    float dx = .5;
     int x_dim = (int) (L / dx);
-    int num_steps = 21;
+    int num_steps = 51;
     // heat coeff
-    float alpha = 1;
+    float alpha = .1;
     float w_out = 1;
     float writes = 0;
 
-    vector<float> x_vals(x_dim + 2, init_inner);
+    // vector<float> x_vals(x_dim + 2, init_inner);
+    vector<float> x_vals(x_dim + 2);
+    for(int i = 1; i < (x_dim + 1); i++) {
+        x_vals[i] = sin(i);
+    }
     x_vals[0] = init_border;
     x_vals[x_dim + 1] = init_border;
 
     ofstream file("data.csv");
     file << "x,";
     for (int j = 1; j < (x_dim + 1); j++) {
-        file << j << ",";
+        file << (j * dx);
+        if (j != x_dim) file << ",";
     }
     file << endl;
 
@@ -51,6 +57,7 @@ int main() {
                     file << "\n";
                 }
             }
+            // actual update
             x_vals[j] += ((alpha * dt) / (dx*dx)) * (x_vals[j - 1] - (2 * x_vals[j]) + x_vals[j + 1]);
         }
         curr_time += dt;
