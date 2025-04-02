@@ -1,6 +1,5 @@
 #include <vector>
 #include <iostream>
-#include <iostream>
 #include <fstream>
 #include <stdio.h>
 #include <string>
@@ -32,7 +31,10 @@ int main() {
     x_vals[0] = init_border;
     x_vals[x_dim + 1] = init_border;
 
-    ofstream file("data.csv");
+    char str[20];
+    sprintf(str, "2d/ex_%04d.vtk", 0);
+
+    ofstream file(str);
     file << "x,";
     for (int j = 1; j < (x_dim + 1); j++) {
         file << (j * dx);
