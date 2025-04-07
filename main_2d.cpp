@@ -13,16 +13,21 @@ using namespace std;
 void print_x(vector<vector<double>> x, double time);
 void output_to_file(vector<vector<double>> x, int step, int x_dim, int y_dim);
 
+template <typename T>
+T square(T num) {
+    return num * num;
+}
+
 int main() {
     double init_inner = 10.0;
     double init_border = 0;
 
     double curr_time = 0;
-    double dt = .01;
+    double dt = .0001;
     double Lx = 1.0;
     double Ly = 1.0;
-    int x_dim = 10;
-    int y_dim = 10;
+    int x_dim = 256; // 256
+    int y_dim = 96; // 96
     double dx = Lx / x_dim;
     double dy = Ly / y_dim;
     int num_steps = 100;
@@ -35,8 +40,20 @@ int main() {
     int x_total = x_dim + 2;
     int y_total = y_dim + 2;
 
+    double min_h = dx;
+    if (dy < dx) min_h = dy;
+
+    double max_dt = (min_h * min_h) / (4 * alpha);
+    // printf("dx: %f, dy: %f, min_h: %f, max_dt: %f\n", dx, dy, min_h, max_dt);
+
+    if (dt >= max_dt) {
+        printf("dt too large. setting it to %f\n", max_dt);
+        dt = max_dt;
+    }
+
     vector<vector<double>> x(x_total, vector<double> (y_total, init_inner));
-    printf("init_inner: %lf\n", init_inner);
+    vector<vector<double>> prev(x_total, vector<double> (y_total, init_inner));
+    // printf("init_inner: %lf\n", init_inner);
 
     for (int i = 0; i < x_total; i++) {
         x[i][0] = init_border;
@@ -48,23 +65,31 @@ int main() {
         x[x_total - 1][j] = init_border;
     }
 
-    // print_x(x, curr_time);
+    print_x(x, curr_time);
     output_to_file(x, 0, x_dim, y_dim);
 
     double sx = (alpha * dt) / (dx * dx);
     double sy = (alpha * dt) / (dy * dy);
 
-    printf("alpha: %f, dt: %f, dx: %f, dy: %f, sx: %f, sy: %f\n", alpha, dt, dx, dy, sx, sy);
+    // printf("alpha: %f, dt: %f, dx: %f, dy: %f, sx: %f, sy: %f\n", alpha, dt, dx, dy, sx, sy);
 
     for (int k = 1; k <= num_steps; k++) {
+        double diff = 0;
         for (int i = 1; i <= x_dim; i++) {
             for (int j = 1; j <= y_dim; j++) {
+                prev[i][j] = x[i][j];
                 x[i][j] += (sx * (x[i + 1][j] - (2*x[i][j]) + x[i - 1][j])) + (sy * (x[i][j + 1] - (2*x[i][j]) + x[i][j - 1]));
+                diff += square(x[i][j] - prev[i][j]);
             }
         }
         curr_time += dt;
-        // print_x(x, curr_time);
+        print_x(x, curr_time);
         output_to_file(x, k, x_dim, y_dim);
+        // printf("diff: %f\n", diff);
+        if (diff < .01) {
+            printf("convergence at step %d\n", k);
+            break;
+        }
     }
 
 }
@@ -86,8 +111,6 @@ void output_to_file(vector<vector<double>> x, int step, int x_dim, int y_dim) {
     file_name << setw(4) << setfill('0') << step;
     file_name << ".vtk";
 
-    // printf("x_dim: %d, y_dim: %d\n", x_dim, y_dim);
-
     double x_spacing = 1.0 / (x_dim - 1);
     double y_spacing = 1.0 / (y_dim - 1);
 
@@ -96,9 +119,9 @@ void output_to_file(vector<vector<double>> x, int step, int x_dim, int y_dim) {
     fprintf(file, "Temperature data\n");
     fprintf(file, "ASCII\n");
     fprintf(file, "DATASET STRUCTURED_POINTS\n");
-    fprintf(file, "DIMENSIONS %d %d 1\n", x_dim, y_dim);
+    fprintf(file, "DIMENSIONS %d %d 1\n", y_dim, x_dim);
     fprintf(file, "ORIGIN 0 0 0\n");
-    fprintf(file, "SPACING %f %f 1\n", x_spacing, y_spacing);
+    fprintf(file, "SPACING %f %f 1\n", y_spacing, x_spacing);
     fprintf(file, "POINT_DATA %d\n", x_dim * y_dim);
     fprintf(file, "SCALARS Temp float 1\n");
     fprintf(file, "LOOKUP_TABLE default\n");
