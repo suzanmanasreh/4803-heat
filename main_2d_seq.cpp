@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <iomanip>
 #include <sstream>
+#include <mpi.h>
 
 using namespace std;
 
@@ -19,6 +20,7 @@ T square(T num) {
 }
 
 int main() {
+    double t1, t2;
     double init_inner = 10.0;
     double init_border = 0;
 
@@ -26,8 +28,8 @@ int main() {
     double dt = .0001;
     double Lx = 1.0;
     double Ly = 1.0;
-    int x_dim = 256; // 256
-    int y_dim = 96; // 96
+    int x_dim = 256;
+    int y_dim = 96;
     double dx = Lx / x_dim;
     double dy = Ly / y_dim;
     int num_steps = 100;
@@ -65,13 +67,13 @@ int main() {
         x[x_total - 1][j] = init_border;
     }
 
-    print_x(x, curr_time);
+    // print_x(x, curr_time);
     output_to_file(x, 0, x_dim, y_dim);
 
     double sx = (alpha * dt) / (dx * dx);
     double sy = (alpha * dt) / (dy * dy);
 
-    // printf("alpha: %f, dt: %f, dx: %f, dy: %f, sx: %f, sy: %f\n", alpha, dt, dx, dy, sx, sy);
+    t1 = MPI_Wtime();
 
     for (int k = 1; k <= num_steps; k++) {
         double diff = 0;
@@ -83,14 +85,18 @@ int main() {
             }
         }
         curr_time += dt;
-        print_x(x, curr_time);
+        // print_x(x, curr_time);
         output_to_file(x, k, x_dim, y_dim);
-        // printf("diff: %f\n", diff);
         if (diff < .01) {
             printf("convergence at step %d\n", k);
             break;
         }
     }
+
+    t2 = MPI_Wtime();
+
+    double tot_time = t2 - t1;
+    printf("total time: %f\n", tot_time);
 
 }
 
