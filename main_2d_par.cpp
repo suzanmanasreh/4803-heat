@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
 
     int num_domains = x_domains * y_domains;
 
-    if (rank == 0 && p != x_domains * y_domains) {
+    if (rank == 0 && p != num_domains) {
         printf("Warning: Mismatch between number of processors %d and number of domains %d\n", p, num_domains);
     }
 
@@ -253,16 +253,21 @@ int main(int argc, char *argv[]) {
 
     arr_2d x_final_2d(boost::extents[x_dim][y_dim]);
 
-    for (idx i = 0; i < p; i++) {
-        for (idx j = 0; j < y_cells; j++) {
-            long x_idx = i % x_domains;
-            long y_idx = i / y_domains + j + (i / y_domains);
-            long final_idx = i*y_cells + j;
-            if (rank == 0) {
-                printf("x_final_2d[%ld][%ld] = x_final[%ld]\n", x_idx, y_idx, final_idx);
-                // print_x(x_final_2d, curr_time);
+    for (idx k = 0; k < p; k++) {
+        for (idx i = 0; i < x_cells; i++) {
+            for (idx j = 0; j < y_cells; j++) {
+                long block_x_offset = (k % x_domains) * x_cells;
+                long block_y_offset = (k / x_domains) * y_cells;
+                long x_idx = block_x_offset + i;
+                long y_idx = block_y_offset + j;
+                long final_idx = k*block_size + i*y_cells + j;
+
+                if (rank == 0) {
+                    printf("x_final_2d[%ld][%ld] = x_final[%ld]\n", x_idx, y_idx, final_idx);
+                    // print_x(x_final_2d, curr_time);
+                }
+                x_final_2d[x_idx][y_idx] = x_final[final_idx];
             }
-            x_final_2d[x_idx][y_idx] = x_final[final_idx];
         }
     }
 

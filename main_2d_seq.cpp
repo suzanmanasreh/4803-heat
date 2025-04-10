@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
     double dt = .01;
     double Lx = 1.0;
     double Ly = 1.0;
-    int x_dim = 4;
+    int x_dim = 8;
     int y_dim = 4;
     double dx = Lx / x_dim;
     double dy = Ly / y_dim;
@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
         }
         curr_time += dt;
         // print_x(x, curr_time);
-        // output_to_file(x, k, x_dim, y_dim);
+        output_to_file(x, k, x_dim, y_dim);
         if (diff < .01) {
             printf("convergence at step %d\n", k);
             break;
