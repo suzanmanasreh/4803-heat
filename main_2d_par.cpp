@@ -19,6 +19,7 @@ typedef arr_2d::index idx;
 void print_x(arr_2d x, double time);
 void print_1d(vector<double> x, double time, string name, int rank);
 void output_to_file(arr_2d x, int step, int x_dim, int y_dim);
+void gather_and_output(arr_2d &x, MPI_Comm comm, int rank, int p, int x_cells, int y_cells, int x_domains, int y_domains, int x_dim, int y_dim, int x_start, int x_end, int y_start, int y_end, double curr_time, int k);
 
 template <typename T>
 T square(T num) {
@@ -224,6 +225,34 @@ int main(int argc, char *argv[]) {
     double tot_time = t2 - t1;
     if (rank == 0) printf("total time: %f\n", tot_time);
 
+    gather_and_output(x, comm, rank, p, x_cells, y_cells, x_domains, y_domains, x_dim, y_dim, x_start, x_end, y_start, y_end, curr_time, k);
+
+    MPI_Finalize();
+
+    return 0;
+}
+
+// print our grid of values
+void print_x(arr_2d x, double time) {
+    printf("curr_time: %f\n", time);
+    for(idx i = 0; i < x.size(); i++){
+		for(idx j = 0; j < x[i].size(); j++) {
+            printf("%5.02f ", x[i][j]);
+        }
+        printf("\n");
+	}
+}
+
+void print_1d(vector<double> x, double time, string name, int rank) {
+    printf("curr_time: %f\n", time);
+    printf("rank %d %s: ", rank, name.c_str());
+    for(int i = 0; i < x.size(); i++){
+        printf("%5.02f ", x[i]);
+	}
+    printf("\n");
+}
+
+void gather_and_output(arr_2d &x, MPI_Comm comm, int rank, int p, int x_cells, int y_cells, int x_domains, int y_domains, int x_dim, int y_dim, int x_start, int x_end, int y_start, int y_end, double curr_time, int k) {
     int block_size = x_cells * y_cells;
 
     vector<double> x_flat(block_size, 0);
@@ -251,55 +280,29 @@ int main(int argc, char *argv[]) {
         // print_x(x_final_2d, curr_time);
     }
 
-    arr_2d x_final_2d(boost::extents[x_dim][y_dim]);
+    if (rank == 0) {
+        arr_2d x_final_2d(boost::extents[x_dim][y_dim]);
 
-    for (idx k = 0; k < p; k++) {
-        for (idx i = 0; i < x_cells; i++) {
-            for (idx j = 0; j < y_cells; j++) {
-                long block_x_offset = (k % x_domains) * x_cells;
-                long block_y_offset = (k / x_domains) * y_cells;
-                long x_idx = block_x_offset + i;
-                long y_idx = block_y_offset + j;
-                long final_idx = k*block_size + i*y_cells + j;
+        for (idx k = 0; k < p; k++) {
+            for (idx i = 0; i < x_cells; i++) {
+                for (idx j = 0; j < y_cells; j++) {
+                    long block_x_offset = (k % x_domains) * x_cells;
+                    long block_y_offset = (k / x_domains) * y_cells;
+                    long x_idx = block_x_offset + i;
+                    long y_idx = block_y_offset + j;
+                    long final_idx = k*block_size + i*y_cells + j;
 
-                if (rank == 0) {
-                    printf("x_final_2d[%ld][%ld] = x_final[%ld]\n", x_idx, y_idx, final_idx);
-                    // print_x(x_final_2d, curr_time);
+                    if (rank == 0) {
+                        printf("x_final_2d[%ld][%ld] = x_final[%ld]\n", x_idx, y_idx, final_idx);
+                        // print_x(x_final_2d, curr_time);
+                    }
+                    x_final_2d[x_idx][y_idx] = x_final[final_idx];
                 }
-                x_final_2d[x_idx][y_idx] = x_final[final_idx];
             }
         }
-    }
-
-    if (rank == 0) {
         print_x(x_final_2d, curr_time);
         output_to_file(x_final_2d, k, x_dim, y_dim);
     }
-
-
-    MPI_Finalize();
-
-    return 0;
-}
-
-// print our grid of values
-void print_x(arr_2d x, double time) {
-    printf("curr_time: %f\n", time);
-    for(idx i = 0; i < x.size(); i++){
-		for(idx j = 0; j < x[i].size(); j++) {
-            printf("%5.02f ", x[i][j]);
-        }
-        printf("\n");
-	}
-}
-
-void print_1d(vector<double> x, double time, string name, int rank) {
-    printf("curr_time: %f\n", time);
-    printf("rank %d %s: ", rank, name.c_str());
-    for(int i = 0; i < x.size(); i++){
-        printf("%5.02f ", x[i]);
-	}
-    printf("\n");
 }
 
 void output_to_file(arr_2d x, int step, int x_dim, int y_dim) {
