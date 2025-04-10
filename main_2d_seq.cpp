@@ -25,11 +25,11 @@ int main() {
     double init_border = 0;
 
     double curr_time = 0;
-    double dt = .0001;
+    double dt = .01;
     double Lx = 1.0;
     double Ly = 1.0;
-    int x_dim = 256;
-    int y_dim = 96;
+    int x_dim = 2;
+    int y_dim = 4;
     double dx = Lx / x_dim;
     double dy = Ly / y_dim;
     int num_steps = 100;
