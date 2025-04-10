@@ -11,15 +11,15 @@
 
 using namespace std;
 
-void print_x(vector<vector<double>> x, double time);
-void output_to_file(vector<vector<double>> x, int step, int x_dim, int y_dim);
+void print_x(vector<vector<double> > x, double time);
+void output_to_file(vector<vector<double> > x, int step, int x_dim, int y_dim);
 
 template <typename T>
 T square(T num) {
     return num * num;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
     double t1, t2;
     double init_inner = 10.0;
     double init_border = 0;
@@ -28,7 +28,7 @@ int main() {
     double dt = .01;
     double Lx = 1.0;
     double Ly = 1.0;
-    int x_dim = 2;
+    int x_dim = 4;
     int y_dim = 4;
     double dx = Lx / x_dim;
     double dy = Ly / y_dim;
@@ -53,8 +53,8 @@ int main() {
         dt = max_dt;
     }
 
-    vector<vector<double>> x(x_total, vector<double> (y_total, init_inner));
-    vector<vector<double>> prev(x_total, vector<double> (y_total, init_inner));
+    vector<vector<double> > x(x_total, vector<double> (y_total, init_inner));
+    vector<vector<double> > prev(x_total, vector<double> (y_total, init_inner));
     // printf("init_inner: %lf\n", init_inner);
 
     for (int i = 0; i < x_total; i++) {
@@ -73,6 +73,13 @@ int main() {
     double sx = (alpha * dt) / (dx * dx);
     double sy = (alpha * dt) / (dy * dy);
 
+    MPI_Init(&argc, &argv);
+    int rank, p;
+    MPI_Comm comm = MPI_COMM_WORLD;
+
+    MPI_Comm_size(comm, &p);
+    MPI_Comm_rank(comm, &rank);
+
     t1 = MPI_Wtime();
 
     for (int k = 1; k <= num_steps; k++) {
@@ -86,11 +93,15 @@ int main() {
         }
         curr_time += dt;
         // print_x(x, curr_time);
-        output_to_file(x, k, x_dim, y_dim);
+        // output_to_file(x, k, x_dim, y_dim);
         if (diff < .01) {
             printf("convergence at step %d\n", k);
             break;
         }
+    }
+
+    if (rank == 0) {
+        print_x(x, curr_time);
     }
 
     t2 = MPI_Wtime();
@@ -98,10 +109,11 @@ int main() {
     double tot_time = t2 - t1;
     printf("total time: %f\n", tot_time);
 
+    MPI_Finalize();
 }
 
 // print our grid of values
-void print_x(vector<vector<double>> x, double time) {
+void print_x(vector<vector<double> > x, double time) {
     printf("curr_time: %f\n", time);
     for(int i = 0; i < x.size(); i++){
 		for(int j = 0; j < x[i].size(); j++) {
@@ -111,7 +123,7 @@ void print_x(vector<vector<double>> x, double time) {
 	}
 }
 
-void output_to_file(vector<vector<double>> x, int step, int x_dim, int y_dim) {
+void output_to_file(vector<vector<double> > x, int step, int x_dim, int y_dim) {
     ostringstream file_name;
     file_name << "2d/ex_";
     file_name << setw(4) << setfill('0') << step;

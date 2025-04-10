@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
     double dt = .01;
     double Lx = 1.0;
     double Ly = 1.0;
-    int x_dim = 2;
+    int x_dim = 4;
     int y_dim = 4;
     double dx = Lx / x_dim;
     double dy = Ly / y_dim;
@@ -178,20 +178,6 @@ int main(int argc, char *argv[]) {
     MPI_Type_vector(x_cells, 1, y_total, MPI_DOUBLE, &column);
     MPI_Type_commit(&column);
 
-    MPI_Status status;
-    int tag = 1;
-
-    // update up/down boundaries at ghost cells on receiver end
-    MPI_Sendrecv(&x[x_end][y_start], y_cells, MPI_DOUBLE, neighbor[UP], tag, &x[x_start - 1][y_start], y_cells, MPI_DOUBLE, neighbor[DOWN], tag, comm_cart, &status);
-
-    MPI_Sendrecv(&x[x_start][y_start], y_cells, MPI_DOUBLE, neighbor[DOWN], tag, &x[x_end + 1][y_start], y_cells, MPI_DOUBLE, neighbor[UP], tag, comm_cart, &status);
-
-    tag = 2;
-    // update left/right boundaries at ghost cells on receiver end
-    MPI_Sendrecv(&x[x_start][y_end], 1, column, neighbor[RIGHT], tag, &x[x_start][y_start - 1], 1, column, neighbor[LEFT], tag, comm_cart, &status);
-
-    MPI_Sendrecv(&x[x_start][y_start], 1, column, neighbor[LEFT], tag, &x[x_start][y_end + 1], 1, column, neighbor[RIGHT], tag, comm_cart, &status);
-
     if (rank == 0) {
         print_x(x, curr_time);
     }
@@ -201,7 +187,8 @@ int main(int argc, char *argv[]) {
 
     t1 = MPI_Wtime();
 
-    for (int k = 1; k <= num_steps; k++) {
+    int k;
+    for (k = 1; k <= num_steps; k++) {
         // double diff = 0;
         for (int i = x_start; i <= x_end; i++) {
             for (int j = y_start; j <= y_end; j++) {
@@ -210,6 +197,7 @@ int main(int argc, char *argv[]) {
                 // diff += square(x[i][j] - prev[i][j]);
             }
         }
+        MPI_Status status;
         int tag = 1;
 
         // update up/down boundaries at ghost cells on receiver end
@@ -240,7 +228,6 @@ int main(int argc, char *argv[]) {
 
     vector<double> x_flat(block_size, 0);
     vector<double> x_final(x_dim * y_dim, 0);
-    arr_2d x_final_2d(boost::extents[x_dim][y_dim]);
 
     int j = 0;
     for (int i = x_start; i <= x_end; i++, j++) {
@@ -262,6 +249,26 @@ int main(int argc, char *argv[]) {
     if (rank == 0) {
         print_1d(x_final, curr_time, "x_final after", rank);
         // print_x(x_final_2d, curr_time);
+    }
+
+    arr_2d x_final_2d(boost::extents[x_dim][y_dim]);
+
+    for (idx i = 0; i < p; i++) {
+        for (idx j = 0; j < y_cells; j++) {
+            long x_idx = i % x_domains;
+            long y_idx = i / y_domains + j + (i / y_domains);
+            long final_idx = i*y_cells + j;
+            if (rank == 0) {
+                printf("x_final_2d[%ld][%ld] = x_final[%ld]\n", x_idx, y_idx, final_idx);
+                // print_x(x_final_2d, curr_time);
+            }
+            x_final_2d[x_idx][y_idx] = x_final[final_idx];
+        }
+    }
+
+    if (rank == 0) {
+        print_x(x_final_2d, curr_time);
+        output_to_file(x_final_2d, k, x_dim, y_dim);
     }
 
 
@@ -310,8 +317,9 @@ void output_to_file(arr_2d x, int step, int x_dim, int y_dim) {
     fprintf(file, "POINT_DATA %d\n", x_dim * y_dim);
     fprintf(file, "SCALARS Temp float 1\n");
     fprintf(file, "LOOKUP_TABLE default\n");
-    for(int i = 1; i <= x_dim; i++){
-		for(int j = 1; j <= y_dim; j++) {
+    
+    for(int i = 0; i < x_dim; i++){
+		for(int j = 0; j < y_dim; j++) {
             fprintf(file, "%4.02f\n", x[i][j]);
         }
 	}
