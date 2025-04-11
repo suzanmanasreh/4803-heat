@@ -43,8 +43,8 @@ int main(int argc, char *argv[]) {
     double dt = .01;
     double Lx = 1.0;
     double Ly = 1.0;
-    int x_dim = 4;
-    int y_dim = 4;
+    int x_dim = 1000;
+    int y_dim = 1000;
     double dx = Lx / x_dim;
     double dy = Ly / y_dim;
     int num_steps = 100;
@@ -54,14 +54,22 @@ int main(int argc, char *argv[]) {
     double w_out = 1;
     double writes = 0;
 
-    int x_domains = 2;
+    int x_domains = 4;
     int y_domains = 2;
 
     int num_domains = x_domains * y_domains;
 
-    if (rank == 0 && p != num_domains) {
-        printf("Warning: Mismatch between number of processors %d and number of domains %d\n", p, num_domains);
+    if (p != num_domains) {
+        if (rank == 0)
+            printf("Aborting: Mismatch between number of processors %d and number of domains %d\n", p, num_domains);
+        return 0;
     }
+    if (x_dim % x_domains != 0 && y_dim % y_domains != 0) {
+        if (rank == 0)
+            printf("Aborting: Dimensions not divisible by domain size\n");
+        return 0;
+    }
+
 
     int x_cells = x_dim / x_domains;
     int y_cells = y_dim / y_domains;
@@ -123,10 +131,10 @@ int main(int argc, char *argv[]) {
         x[x_total - 2][j] = init_border;
     }
 
-    if (rank == 0) {
-        print_x(x, curr_time);
-        output_to_file(x, 0, x_dim, y_dim);
-    }
+    // if (rank == 0) {
+    //     print_x(x, curr_time);
+    //     output_to_file(x, 0, x_dim, y_dim);
+    // }
 
     // why would we need these values for all other processors?
     int x_start, x_end, y_start, y_end;
@@ -146,7 +154,7 @@ int main(int argc, char *argv[]) {
     MPI_Cart_coords(comm_cart, new_rank, 2, my_coords);
 
     // print my location in the 2D torus.
-    printf("[MPI process %d] I am located at (%d, %d).\n", new_rank, my_coords[0], my_coords[1]);
+    // printf("[MPI process %d] I am located at (%d, %d).\n", new_rank, my_coords[0], my_coords[1]);
     // use this later for reducing space complexity
 
     // might have to use loops if this causes problems later
@@ -155,7 +163,7 @@ int main(int argc, char *argv[]) {
     y_start = my_coords[0] * (y_cells + 2) + 2;
     y_end = y_start + y_cells - 1;
 
-    printf("[MPI process %d] x_start: %d, x_end: %d, y_start: %d, y_end: %d\n", new_rank, x_start, x_end, y_start, y_end);
+    // printf("[MPI process %d] x_start: %d, x_end: %d, y_start: %d, y_end: %d\n", new_rank, x_start, x_end, y_start, y_end);
  
 
     enum DIRECTIONS {DOWN, UP, LEFT, RIGHT};
@@ -179,9 +187,9 @@ int main(int argc, char *argv[]) {
     MPI_Type_vector(x_cells, 1, y_total, MPI_DOUBLE, &column);
     MPI_Type_commit(&column);
 
-    if (rank == 0) {
-        print_x(x, curr_time);
-    }
+    // if (rank == 0) {
+    //     print_x(x, curr_time);
+    // }
 
     double sx = (alpha * dt) / (dx * dx);
     double sy = (alpha * dt) / (dy * dy);
@@ -190,12 +198,13 @@ int main(int argc, char *argv[]) {
 
     int k;
     for (k = 1; k <= num_steps; k++) {
-        // double diff = 0;
+        double diff = 0;
+        double global_diff = 0;
         for (int i = x_start; i <= x_end; i++) {
             for (int j = y_start; j <= y_end; j++) {
-                // prev[i][j] = x[i][j];
+                prev[i][j] = x[i][j];
                 x[i][j] += (sx * (x[i + 1][j] - (2*x[i][j]) + x[i - 1][j])) + (sy * (x[i][j + 1] - (2*x[i][j]) + x[i][j - 1]));
-                // diff += square(x[i][j] - prev[i][j]);
+                diff += square(x[i][j] - prev[i][j]);
             }
         }
         MPI_Status status;
@@ -212,12 +221,18 @@ int main(int argc, char *argv[]) {
 
         MPI_Sendrecv(&x[x_start][y_start], 1, column, neighbor[LEFT], tag, &x[x_start][y_end + 1], 1, column, neighbor[RIGHT], tag, comm_cart, &status);
         curr_time += dt;
+
         // print_x(x, curr_time);
         // output_to_file(x, k, x_dim, y_dim);
-        // if (diff < .01) {
-        //     printf("convergence at step %d\n", k);
-        //     break;
-        // }
+        // gather_and_output(x, comm, rank, p, x_cells, y_cells, x_domains, y_domains, x_dim, y_dim, x_start, x_end, y_start, y_end, curr_time, k);
+
+        MPI_Allreduce(&diff, &global_diff, 1, MPI_DOUBLE, MPI_SUM, comm);
+        global_diff = sqrt(global_diff);
+        MPI_Bcast(&global_diff, 1, MPI_DOUBLE, 0, comm);
+        if (global_diff < .01) {
+            printf("rank %d convergence at step %d\n", rank, k);
+            break;
+        }
     }
 
     t2 = MPI_Wtime();
@@ -225,7 +240,7 @@ int main(int argc, char *argv[]) {
     double tot_time = t2 - t1;
     if (rank == 0) printf("total time: %f\n", tot_time);
 
-    gather_and_output(x, comm, rank, p, x_cells, y_cells, x_domains, y_domains, x_dim, y_dim, x_start, x_end, y_start, y_end, curr_time, k);
+    // gather_and_output(x, comm, rank, p, x_cells, y_cells, x_domains, y_domains, x_dim, y_dim, x_start, x_end, y_start, y_end, curr_time, k);
 
     MPI_Finalize();
 
@@ -265,20 +280,20 @@ void gather_and_output(arr_2d &x, MPI_Comm comm, int rank, int p, int x_cells, i
         }
     }
 
-    print_1d(x_flat, curr_time, "x_flat", rank);
+    // print_1d(x_flat, curr_time, "x_flat", rank);
 
-    if (rank == 0) {
-        print_1d(x_final, curr_time, "x_final before", rank);
-    }
+    // if (rank == 0) {
+    //     print_1d(x_final, curr_time, "x_final before", rank);
+    // }
 
     // MPI_Gather(x_flat.data(), block_size, MPI_DOUBLE, x_final_2d.data(), block_size, MPI_DOUBLE, 0, comm);
     MPI_Gather(x_flat.data(), block_size, MPI_DOUBLE, x_final.data(), block_size, MPI_DOUBLE, 0, comm);
     MPI_Barrier(comm);
 
-    if (rank == 0) {
-        print_1d(x_final, curr_time, "x_final after", rank);
-        // print_x(x_final_2d, curr_time);
-    }
+    // if (rank == 0) {
+    //     print_1d(x_final, curr_time, "x_final after", rank);
+    //     // print_x(x_final_2d, curr_time);
+    // }
 
     if (rank == 0) {
         arr_2d x_final_2d(boost::extents[x_dim][y_dim]);
@@ -292,15 +307,15 @@ void gather_and_output(arr_2d &x, MPI_Comm comm, int rank, int p, int x_cells, i
                     long y_idx = block_y_offset + j;
                     long final_idx = k*block_size + i*y_cells + j;
 
-                    if (rank == 0) {
-                        printf("x_final_2d[%ld][%ld] = x_final[%ld]\n", x_idx, y_idx, final_idx);
-                        // print_x(x_final_2d, curr_time);
-                    }
+                    // if (rank == 0) {
+                    //     printf("x_final_2d[%ld][%ld] = x_final[%ld]\n", x_idx, y_idx, final_idx);
+                    //     // print_x(x_final_2d, curr_time);
+                    // }
                     x_final_2d[x_idx][y_idx] = x_final[final_idx];
                 }
             }
         }
-        print_x(x_final_2d, curr_time);
+        // print_x(x_final_2d, curr_time);
         output_to_file(x_final_2d, k, x_dim, y_dim);
     }
 }
