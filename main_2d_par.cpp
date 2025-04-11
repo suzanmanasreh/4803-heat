@@ -10,7 +10,6 @@
 #include <mpi.h>
 #include "boost/multi_array.hpp"
 
-
 using namespace std;
 
 typedef boost::multi_array<double, 2> arr_2d;
@@ -43,8 +42,8 @@ int main(int argc, char *argv[]) {
     double dt = .01;
     double Lx = 1.0;
     double Ly = 1.0;
-    int x_dim = 1000;
-    int y_dim = 1000;
+    int x_dim = 100;
+    int y_dim = 100;
     double dx = Lx / x_dim;
     double dy = Ly / y_dim;
     int num_steps = 100;
@@ -54,7 +53,7 @@ int main(int argc, char *argv[]) {
     double w_out = 1;
     double writes = 0;
 
-    int x_domains = 4;
+    int x_domains = 2;
     int y_domains = 2;
 
     int num_domains = x_domains * y_domains;
@@ -224,7 +223,7 @@ int main(int argc, char *argv[]) {
 
         // print_x(x, curr_time);
         // output_to_file(x, k, x_dim, y_dim);
-        // gather_and_output(x, comm, rank, p, x_cells, y_cells, x_domains, y_domains, x_dim, y_dim, x_start, x_end, y_start, y_end, curr_time, k);
+        gather_and_output(x, comm, rank, p, x_cells, y_cells, x_domains, y_domains, x_dim, y_dim, x_start, x_end, y_start, y_end, curr_time, k);
 
         MPI_Allreduce(&diff, &global_diff, 1, MPI_DOUBLE, MPI_SUM, comm);
         global_diff = sqrt(global_diff);
