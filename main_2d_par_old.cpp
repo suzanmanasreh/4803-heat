@@ -15,7 +15,7 @@ using namespace std;
 typedef boost::multi_array<double, 2> arr_2d;
 typedef arr_2d::index idx;
 
-void print_x(arr_2d x, double time, int rank);
+void print_x(arr_2d x, double time);
 void print_1d(vector<double> x, double time, string name, int rank);
 void output_to_file(arr_2d x, int step, int x_dim, int y_dim);
 void gather_and_output(arr_2d &x, MPI_Comm comm, int rank, int p, int x_cells, int y_cells, int x_domains, int y_domains, int x_dim, int y_dim, int x_start, int x_end, int y_start, int y_end, double curr_time, int k);
@@ -42,8 +42,8 @@ int main(int argc, char *argv[]) {
     double dt = .01;
     double Lx = 1.0;
     double Ly = 1.0;
-    int x_dim = 100;
-    int y_dim = 100;
+    int x_dim = 4;
+    int y_dim = 4;
     double dx = Lx / x_dim;
     double dy = Ly / y_dim;
     int num_steps = 100;
@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
     double w_out = 1;
     double writes = 0;
 
-    int x_domains = 4;
+    int x_domains = 2;
     int y_domains = 2;
 
     int num_domains = x_domains * y_domains;
@@ -63,17 +63,15 @@ int main(int argc, char *argv[]) {
             printf("Aborting: Mismatch between number of processors %d and number of domains %d\n", p, num_domains);
         return 0;
     }
-    if (x_dim % x_domains != 0 || y_dim % y_domains != 0) {
+    if (x_dim % x_domains != 0 && y_dim % y_domains != 0) {
         if (rank == 0)
             printf("Aborting: Dimensions not divisible by domain size\n");
         return 0;
     }
 
+
     int x_cells = x_dim / x_domains;
     int y_cells = y_dim / y_domains;
-
-    int x_my_total = x_cells + 2;
-    int y_my_total = y_cells + 2;
 
     if (rank == 0) {
         printf("x_cells: %d, y_cells: %d\n", x_cells, y_cells);
@@ -102,6 +100,43 @@ int main(int argc, char *argv[]) {
         dt = max_dt;
     }
 
+    arr_2d x(boost::extents[x_total][y_total]);
+    arr_2d prev(boost::extents[x_total][y_total]);
+
+    fill(x.data(), x.data() + x.num_elements(), init_inner);
+    fill(prev.data(), prev.data() + prev.num_elements(), init_inner);
+
+    // print_x(x, curr_time);
+
+    // initilize borders to border values
+    for (idx i = 0; i < x_total; i++) {
+        x[i][0] = init_border;
+        x[i][y_total - 1] = init_border;
+    }
+
+    for (idx j = 0; j < y_total; j++) {
+        x[0][j] = init_border;
+        x[x_total - 1][j] = init_border;
+    }
+
+    // initialize ghost cells next to border to border values
+    for (idx i = 1; i < x_total - 1; i++) {
+        x[i][1] = init_border;
+        x[i][y_total - 2] = init_border;
+    }
+
+    for (idx j = 1; j < y_total - 1; j++) {
+        x[1][j] = init_border;
+        x[x_total - 2][j] = init_border;
+    }
+
+    // if (rank == 0) {
+    //     print_x(x, curr_time);
+    //     output_to_file(x, 0, x_dim, y_dim);
+    // }
+
+    // why would we need these values for all other processors?
+    int x_start, x_end, y_start, y_end;
 
     MPI_Comm comm_cart;
     int dims[2] = {y_domains, x_domains};
@@ -122,16 +157,16 @@ int main(int argc, char *argv[]) {
     // use this later for reducing space complexity
 
     // might have to use loops if this causes problems later
-    int x_start = 1;
-    int x_end = x_start + x_cells - 1;
-    int y_start = 1;
-    int y_end = y_start + y_cells - 1;
+    x_start = my_coords[1] * (x_cells + 2) + 2;
+    x_end = x_start + x_cells - 1;
+    y_start = my_coords[0] * (y_cells + 2) + 2;
+    y_end = y_start + y_cells - 1;
 
     // printf("[MPI process %d] x_start: %d, x_end: %d, y_start: %d, y_end: %d\n", new_rank, x_start, x_end, y_start, y_end);
  
 
     enum DIRECTIONS {DOWN, UP, LEFT, RIGHT};
-    string neighbor_names[4] = {"down", "up", "left", "right"};
+    // string neighbor_names[4] = {"down", "up", "left", "right"};
     vector<int> neighbor(4);
  
     // get left and right neighbours
@@ -141,87 +176,19 @@ int main(int argc, char *argv[]) {
     MPI_Cart_shift(comm_cart, 1, 1, &neighbor[DOWN], &neighbor[UP]);
 
     // for(int i = 0; i < p; i++) {
-    //     if (rank != new_rank) {
-    //         printf("RANK MISMATCH");
-    //     }
-    //     if(neighbor[i] == MPI_PROC_NULL)
-    //         printf("[MPI process %d] I have no %s neighbour.\n", new_rank, neighbor_names[i].c_str());
+    //     if(neighbors_ranks[i] == MPI_PROC_NULL)
+    //         printf("[MPI process %d] I have no %s neighbour.\n", new_rank, neighbors_names[i].c_str());
     //     else
-    //         printf("[MPI process %d] I have a %s neighbour: process %d.\n", new_rank, neighbor_names[i].c_str(), neighbor[i]);
+    //         printf("[MPI process %d] I have a %s neighbour: process %d.\n", new_rank, neighbors_names[i].c_str(), neighbors_ranks[i]);
     // }
 
-
-    if (neighbor[DOWN] == MPI_PROC_NULL) {
-        // x_start -= 1;
-        // x_end -= 1;
-
-        x_my_total += 1;
-    }
-    if (neighbor[LEFT] == MPI_PROC_NULL) {
-        y_start += 1;
-        y_end += 1;
-
-        y_my_total += 1;
-    }
-    if (neighbor[UP] == MPI_PROC_NULL) {
-        x_start += 1;
-        x_end += 1;
-
-        x_my_total += 1;
-
-    }
-    if (neighbor[RIGHT] == MPI_PROC_NULL) {
-        // y_start -= 1;
-        // y_end -= 1;
-
-        y_my_total += 1;
-    }
-
-    // printf("[MPI process %d] x_my_total: %d, y_my_total: %d, x_start: %d, x_end: %d, y_start: %d, y_end: %d\n", rank, x_my_total, y_my_total, x_start, x_end, y_start, y_end);
-
     MPI_Datatype column;
-    MPI_Type_vector(x_cells, 1, y_my_total, MPI_DOUBLE, &column);
+    MPI_Type_vector(x_cells, 1, y_total, MPI_DOUBLE, &column);
     MPI_Type_commit(&column);
 
-    arr_2d x(boost::extents[x_my_total][y_my_total]);
-    arr_2d prev(boost::extents[x_my_total][y_my_total]);
-
-    fill(x.data(), x.data() + x.num_elements(), init_inner);
-    fill(prev.data(), prev.data() + prev.num_elements(), init_inner);
-
-
-    // initilize borders to border values
-    for (idx i = 0; i < x_my_total; i++) {
-        if (neighbor[LEFT] == MPI_PROC_NULL)
-            x[i][0] = init_border;
-        if (neighbor[RIGHT] == MPI_PROC_NULL)
-            x[i][y_my_total - 1] = init_border;
-    }
-
-    for (idx j = 0; j < y_my_total; j++) {
-        if (neighbor[UP] == MPI_PROC_NULL)
-            x[0][j] = init_border;
-        if (neighbor[DOWN] == MPI_PROC_NULL)
-            x[x_my_total - 1][j] = init_border;
-    }
-
-    // initialize ghost cells on left + right border to border values
-    for (idx i = 0; i < x_my_total; i++) {
-        if (neighbor[LEFT] == MPI_PROC_NULL)
-            x[i][1] = init_border;
-        if (neighbor[RIGHT] == MPI_PROC_NULL)
-            x[i][y_my_total - 2] = init_border;
-    }
-
-    // initialize ghost cells on up + down border to border values
-    for (idx j = 0; j < y_my_total; j++) {
-        if (neighbor[UP] == MPI_PROC_NULL)
-            x[1][j] = init_border;
-        if (neighbor[DOWN] == MPI_PROC_NULL)
-            x[x_my_total - 2][j] = init_border;
-    }
-
-    // if (rank == 0 || rank == 1) print_x(x, curr_time, rank);
+    // if (rank == 0) {
+    //     print_x(x, curr_time);
+    // }
 
     double sx = (alpha * dt) / (dx * dx);
     double sy = (alpha * dt) / (dy * dy);
@@ -239,15 +206,13 @@ int main(int argc, char *argv[]) {
                 diff += square(x[i][j] - prev[i][j]);
             }
         }
-        // if (rank == 0) print_x(x, curr_time, rank);
-        // if (rank == 2) print_x(x, curr_time, rank);
         MPI_Status status;
         int tag = 1;
 
         // update up/down boundaries at ghost cells on receiver end
-        MPI_Sendrecv(&x[x_start][y_start], y_cells, MPI_DOUBLE, neighbor[UP], tag, &x[x_end + 1][y_start], y_cells, MPI_DOUBLE, neighbor[DOWN], tag, comm_cart, &status);
+        MPI_Sendrecv(&x[x_end][y_start], y_cells, MPI_DOUBLE, neighbor[UP], tag, &x[x_start - 1][y_start], y_cells, MPI_DOUBLE, neighbor[DOWN], tag, comm_cart, &status);
 
-        MPI_Sendrecv(&x[x_end][y_start], y_cells, MPI_DOUBLE, neighbor[DOWN], tag, &x[x_start - 1][y_start], y_cells, MPI_DOUBLE, neighbor[UP], tag, comm_cart, &status);
+        MPI_Sendrecv(&x[x_start][y_start], y_cells, MPI_DOUBLE, neighbor[DOWN], tag, &x[x_end + 1][y_start], y_cells, MPI_DOUBLE, neighbor[UP], tag, comm_cart, &status);
 
         tag = 2;
         // update left/right boundaries at ghost cells on receiver end
@@ -256,8 +221,7 @@ int main(int argc, char *argv[]) {
         MPI_Sendrecv(&x[x_start][y_start], 1, column, neighbor[LEFT], tag, &x[x_start][y_end + 1], 1, column, neighbor[RIGHT], tag, comm_cart, &status);
         curr_time += dt;
 
-        // if (rank == 0) print_x(x, curr_time, rank);
-        // if (rank == 2) print_x(x, curr_time, rank);
+        // print_x(x, curr_time);
         // output_to_file(x, k, x_dim, y_dim);
         gather_and_output(x, comm, rank, p, x_cells, y_cells, x_domains, y_domains, x_dim, y_dim, x_start, x_end, y_start, y_end, curr_time, k);
 
@@ -283,8 +247,8 @@ int main(int argc, char *argv[]) {
 }
 
 // print our grid of values
-void print_x(arr_2d x, double time, int rank) {
-    printf("rank: %d, curr_time: %f\n", rank, time);
+void print_x(arr_2d x, double time) {
+    printf("curr_time: %f\n", time);
     for(idx i = 0; i < x.size(); i++){
 		for(idx j = 0; j < x[i].size(); j++) {
             printf("%5.02f ", x[i][j]);
@@ -302,28 +266,22 @@ void print_1d(vector<double> x, double time, string name, int rank) {
     printf("\n");
 }
 
-
-
-
 void gather_and_output(arr_2d &x, MPI_Comm comm, int rank, int p, int x_cells, int y_cells, int x_domains, int y_domains, int x_dim, int y_dim, int x_start, int x_end, int y_start, int y_end, double curr_time, int k) {
-    // if (rank == 0 && k == 100) { ************
-    //     print_x(x, curr_time, rank);
-    // }
-    
     int block_size = x_cells * y_cells;
 
     vector<double> x_flat(block_size, 0);
     vector<double> x_final(x_dim * y_dim, 0);
 
     int j = 0;
-    for (int i = x_end; i >= x_start; i--, j++) {
+    for (int i = x_start; i <= x_end; i++, j++) {
         for (int k = 0; k < y_cells; k++) {
             x_flat[j*y_cells + k] = x[i][y_start + k];
         }
     }
+    if (k == 100)
+        print_1d(x_flat, curr_time, "x_flat", rank);
 
-    // if (k == 100) **************
-    //     print_1d(x_flat, curr_time, "x_flat", rank);
+    // print_1d(x_flat, curr_time, "x_flat", rank);
 
     // if (rank == 0) {
     //     print_1d(x_final, curr_time, "x_final before", rank);
@@ -333,10 +291,10 @@ void gather_and_output(arr_2d &x, MPI_Comm comm, int rank, int p, int x_cells, i
     MPI_Gather(x_flat.data(), block_size, MPI_DOUBLE, x_final.data(), block_size, MPI_DOUBLE, 0, comm);
     MPI_Barrier(comm);
 
-    // if (rank == 0 && k == 100) { ********
-    //     print_1d(x_final, curr_time, "x_final after", rank);
-    //     // print_x(x_final_2d, curr_time);
-    // }
+    if (rank == 0 && k == 100) {
+        print_1d(x_final, curr_time, "x_final after", rank);
+        // print_x(x_final_2d, curr_time);
+    }
 
     if (rank == 0) {
         arr_2d x_final_2d(boost::extents[x_dim][y_dim]);
@@ -360,8 +318,8 @@ void gather_and_output(arr_2d &x, MPI_Comm comm, int rank, int p, int x_cells, i
                 }
             }
         }
-        // if (k == 100) *****
-        //     print_x(x_final_2d, curr_time, rank);
+        if (k == 100 && rank == 0)
+            print_x(x_final_2d, curr_time);
         output_to_file(x_final_2d, k, x_dim, y_dim);
     }
 }
