@@ -28,8 +28,8 @@ int main(int argc, char *argv[]) {
     double dt = .01;
     double Lx = 1.0;
     double Ly = 1.0;
-    int x_dim = 100;
-    int y_dim = 100;
+    int x_dim = 1000;
+    int y_dim = 1000;
     double dx = Lx / x_dim;
     double dy = Ly / y_dim;
     int num_steps = 100;
@@ -46,7 +46,6 @@ int main(int argc, char *argv[]) {
     if (dy < dx) min_h = dy;
 
     double max_dt = (min_h * min_h) / (4 * alpha);
-    // printf("dx: %f, dy: %f, min_h: %f, max_dt: %f\n", dx, dy, min_h, max_dt);
 
     if (dt >= max_dt) {
         printf("dt too large. setting it to max_dt: %f, dx: %f, dy: %f, min_h: %f, alpha: %f\n", max_dt, dx, dy, min_h, alpha);
@@ -55,7 +54,6 @@ int main(int argc, char *argv[]) {
 
     vector<vector<double> > x(x_total, vector<double> (y_total, init_inner));
     vector<vector<double> > prev(x_total, vector<double> (y_total, init_inner));
-    // printf("init_inner: %lf\n", init_inner);
 
     for (int i = 0; i < x_total; i++) {
         x[i][0] = init_border;
@@ -92,17 +90,13 @@ int main(int argc, char *argv[]) {
             }
         }
         curr_time += dt;
-        // print_x(x, curr_time);
-        output_to_file(x, k, x_dim, y_dim);
+        // output_to_file(x, k, x_dim, y_dim);
         if (diff < .01) {
             printf("convergence at step %d\n", k);
             break;
         }
     }
 
-    // if (rank == 0) {
-    //     print_x(x, curr_time);
-    // }
 
     t2 = MPI_Wtime();
 
