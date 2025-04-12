@@ -42,8 +42,8 @@ int main(int argc, char *argv[]) {
     double dt = .01;
     double Lx = 1.0;
     double Ly = 1.0;
-    int x_dim = 100;
-    int y_dim = 100;
+    int x_dim = 4;
+    int y_dim = 4;
     double dx = Lx / x_dim;
     double dy = Ly / y_dim;
     int num_steps = 100;
@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
     double w_out = 1;
     double writes = 0;
 
-    int x_domains = 4;
+    int x_domains = 2;
     int y_domains = 2;
 
     int num_domains = x_domains * y_domains;
@@ -342,7 +342,7 @@ void gather_and_output(arr_2d &x, MPI_Comm comm, int rank, int p, int x_cells, i
         arr_2d x_final_2d(boost::extents[x_dim][y_dim]);
 
         for (idx d = 0; d < p; d++) {
-            long block_x_offset = (d % x_domains) * x_cells;
+            long block_x_offset = ((d % x_domains) * x_cells);
             long block_y_offset = (d / x_domains) * y_cells;
             // if (rank == 0 && k == 100)
             //     printf("block_x_offset: %ld, block_y_offset: %ld\n", block_x_offset, block_y_offset);
@@ -360,8 +360,8 @@ void gather_and_output(arr_2d &x, MPI_Comm comm, int rank, int p, int x_cells, i
                 }
             }
         }
-        // if (k == 100) *****
-        //     print_x(x_final_2d, curr_time, rank);
+        if (k == 100)
+            print_x(x_final_2d, curr_time, rank);
         output_to_file(x_final_2d, k, x_dim, y_dim);
     }
 }
