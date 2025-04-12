@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
     // printf("dx: %f, dy: %f, min_h: %f, max_dt: %f\n", dx, dy, min_h, max_dt);
 
     if (dt >= max_dt) {
-        printf("dt too large. setting it to %f\n", max_dt);
+        printf("dt too large. setting it to max_dt: %f, dx: %f, dy: %f, min_h: %f, alpha: %f\n", max_dt, dx, dy, min_h, alpha);
         dt = max_dt;
     }
 

@@ -42,8 +42,8 @@ int main(int argc, char *argv[]) {
     double dt = .01;
     double Lx = 1.0;
     double Ly = 1.0;
-    int x_dim = 4;
-    int y_dim = 4;
+    int x_dim = 100;
+    int y_dim = 100;
     double dx = Lx / x_dim;
     double dy = Ly / y_dim;
     int num_steps = 100;
@@ -53,8 +53,8 @@ int main(int argc, char *argv[]) {
     double w_out = 1;
     double writes = 0;
 
-    int x_domains = 2;
-    int y_domains = 2;
+    int x_domains = 4;
+    int y_domains = 4;
 
     int num_domains = x_domains * y_domains;
 
@@ -75,9 +75,9 @@ int main(int argc, char *argv[]) {
     int x_my_total = x_cells + 2;
     int y_my_total = y_cells + 2;
 
-    if (rank == 0) {
-        printf("x_cells: %d, y_cells: %d\n", x_cells, y_cells);
-    }
+    // if (rank == 0) {
+    //     printf("x_cells: %d, y_cells: %d\n", x_cells, y_cells);
+    // }
 
     int x_global = x_dim + 2;
     int y_global = y_dim + 2;
@@ -85,9 +85,9 @@ int main(int argc, char *argv[]) {
     int x_total = x_global + (2 * x_domains);
     int y_total = y_global + (2 * y_domains);
 
-    if (rank == 0) {
-        printf("x_total: %d, y_total: %d\n", x_total, y_total);
-    }
+    // if (rank == 0) {
+    //     printf("x_total: %d, y_total: %d\n", x_total, y_total);
+    // }
 
     double min_h = dx;
     if (dy < dx) min_h = dy;
@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
 
     if (dt >= max_dt) {
         if (rank == 0) {
-            printf("dt too large. setting it to %f\n", max_dt);
+            printf("dt too large. setting it to max_dt: %f, dx: %f, dy: %f, min_h: %f, alpha: %f\n", max_dt, dx, dy, min_h, alpha);
         }
         dt = max_dt;
     }
@@ -360,8 +360,8 @@ void gather_and_output(arr_2d &x, MPI_Comm comm, int rank, int p, int x_cells, i
                 }
             }
         }
-        if (k == 100)
-            print_x(x_final_2d, curr_time, rank);
+        // if (k == 100)
+        //     print_x(x_final_2d, curr_time, rank);
         output_to_file(x_final_2d, k, x_dim, y_dim);
     }
 }
