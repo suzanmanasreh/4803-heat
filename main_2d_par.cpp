@@ -175,7 +175,7 @@ int main(int argc, char *argv[]) {
     // get up and down neighbours
     MPI_Cart_shift(comm_cart, 1, 1, &neighbor[DOWN], &neighbor[UP]);
 
-    // for(int i = 0; i < 4; i++) {
+    // for(int i = 0; i < p; i++) {
     //     if(neighbors_ranks[i] == MPI_PROC_NULL)
     //         printf("[MPI process %d] I have no %s neighbour.\n", new_rank, neighbors_names[i].c_str());
     //     else
