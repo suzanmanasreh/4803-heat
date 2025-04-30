@@ -7,3 +7,4 @@ examples/
 *.txt
 *.dSYM
 run_logs/*
+.DS_Store
