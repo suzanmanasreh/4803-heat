@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
     int y_dim = 1000;
     double dx = Lx / x_dim;
     double dy = Ly / y_dim;
-    int num_steps = 10000;
+    int num_steps = 100000;
     // heat coeff
     double alpha = .1;
 
