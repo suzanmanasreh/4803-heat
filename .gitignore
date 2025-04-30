@@ -6,3 +6,4 @@
 examples/
 *.txt
 *.dSYM
+run_log/*

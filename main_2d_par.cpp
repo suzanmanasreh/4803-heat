@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <sstream>
 #include <mpi.h>
+#include <omp.h>
 #include "boost/multi_array.hpp"
 
 using namespace std;
@@ -42,19 +43,19 @@ int main(int argc, char *argv[]) {
     double dt = .01;
     double Lx = 1.0;
     double Ly = 1.0;
-    int x_dim = 1000;
-    int y_dim = 1000;
+    int x_dim = 100;
+    int y_dim = 100;
     double dx = Lx / x_dim;
     double dy = Ly / y_dim;
-    int num_steps = 100000;
+    int num_steps = 5000;
     // heat coeff
     double alpha = .1;
 
     int w_out = 100;
-    double writes = 0;
+    double writes = 0; // unused
 
-    int x_domains = 8;
-    int y_domains = 8;
+    int x_domains = 2;
+    int y_domains = 2;
 
     int num_domains = x_domains * y_domains;
 
@@ -127,10 +128,13 @@ int main(int argc, char *argv[]) {
     // get up and down neighbours
     MPI_Cart_shift(comm_cart, 1, 1, &neighbor[DOWN], &neighbor[UP]);
 
+
     if (neighbor[DOWN] == MPI_PROC_NULL) {
         x_my_total += 1;
     }
     if (neighbor[LEFT] == MPI_PROC_NULL) {
+        // the y-axis is in the x-direction
+        // so we 1 to the start and end of y due to left shift
         y_start += 1;
         y_end += 1;
 
@@ -158,35 +162,36 @@ int main(int argc, char *argv[]) {
     fill(prev.data(), prev.data() + prev.num_elements(), init_inner);
 
 
-    // initilize borders to border values
-    for (idx i = 0; i < x_my_total; i++) {
-        if (neighbor[LEFT] == MPI_PROC_NULL)
+    // initilize borders + ghost cells on left and right border to border values
+    if (neighbor[LEFT] == MPI_PROC_NULL) {
+        #pragma omp parallel for
+        for (idx i = 0; i < x_my_total; i++) {
             x[i][0] = init_border;
-        if (neighbor[RIGHT] == MPI_PROC_NULL)
-            x[i][y_my_total - 1] = init_border;
-    }
-
-    for (idx j = 0; j < y_my_total; j++) {
-        if (neighbor[UP] == MPI_PROC_NULL)
-            x[0][j] = init_border;
-        if (neighbor[DOWN] == MPI_PROC_NULL)
-            x[x_my_total - 1][j] = init_border;
-    }
-
-    // initialize ghost cells on left + right border to border values
-    for (idx i = 0; i < x_my_total; i++) {
-        if (neighbor[LEFT] == MPI_PROC_NULL)
             x[i][1] = init_border;
-        if (neighbor[RIGHT] == MPI_PROC_NULL)
+        }
+    }
+    if (neighbor[RIGHT] == MPI_PROC_NULL) {
+        #pragma omp parallel for
+        for (idx i = 0; i < x_my_total; i++) {
+            x[i][y_my_total - 1] = init_border;
             x[i][y_my_total - 2] = init_border;
+        }
     }
 
-    // initialize ghost cells on up + down border to border values
-    for (idx j = 0; j < y_my_total; j++) {
-        if (neighbor[UP] == MPI_PROC_NULL)
+    // initialize borders + ghost cells on up + down border to border values
+    if (neighbor[UP] == MPI_PROC_NULL) {
+        #pragma omp parallel for
+        for (idx j = 0; j < y_my_total; j++) {
+            x[0][j] = init_border;
             x[1][j] = init_border;
-        if (neighbor[DOWN] == MPI_PROC_NULL)
+        }
+    }
+    if (neighbor[DOWN] == MPI_PROC_NULL) {
+        #pragma omp parallel for
+        for (idx j = 0; j < y_my_total; j++) {
+            x[x_my_total - 1][j] = init_border;
             x[x_my_total - 2][j] = init_border;
+        }
     }
 
 
@@ -200,6 +205,8 @@ int main(int argc, char *argv[]) {
     for (k = 1; k <= num_steps; k++) {
         double diff = 0;
         double global_diff = 0;
+
+        #pragma omp parallel for reduction(+:diff)
         for (int i = x_start; i <= x_end; i++) {
             for (int j = y_start; j <= y_end; j++) {
                 prev[i][j] = x[i][j];
@@ -231,7 +238,9 @@ int main(int argc, char *argv[]) {
         if (global_diff < .01) {
             printf("rank %d convergence at step %d\n", rank, k);
             break;
-        }
+        } // else {
+        //    printf("global_diff: %f, diff: %f\n", global_diff, diff);
+        // }
     }
 
     t2 = MPI_Wtime();
@@ -244,7 +253,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-// print our grid of values
+// print our grid of values (debug function)
 void print_x(arr_2d x, double time, int rank) {
     printf("rank: %d, curr_time: %f\n", rank, time);
     for(idx i = 0; i < x.size(); i++){
@@ -255,6 +264,7 @@ void print_x(arr_2d x, double time, int rank) {
 	}
 }
 
+// print 1d vector (debug function)
 void print_1d(vector<double> x, double time, string name, int rank) {
     printf("curr_time: %f\n", time);
     printf("rank %d %s: ", rank, name.c_str());
@@ -307,7 +317,7 @@ void gather_and_output(arr_2d &x, MPI_Comm comm, int rank, int p, int x_cells, i
 
 void output_to_file(arr_2d x, int step, int x_dim, int y_dim) {
     ostringstream file_name;
-    file_name << "2dp/ex_";
+    file_name << "2dpomp/ex_";
     file_name << setw(4) << setfill('0') << step;
     file_name << ".vtk";
 

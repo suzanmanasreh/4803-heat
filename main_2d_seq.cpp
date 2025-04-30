@@ -28,15 +28,15 @@ int main(int argc, char *argv[]) {
     double dt = .01;
     double Lx = 1.0;
     double Ly = 1.0;
-    int x_dim = 1000;
-    int y_dim = 1000;
+    int x_dim = 100;
+    int y_dim = 100;
     double dx = Lx / x_dim;
     double dy = Ly / y_dim;
-    int num_steps = 100;
+    int num_steps = 5000;
     // heat coeff
     double alpha = .1;
 
-    double w_out = 1;
+    int w_out = 100;
     double writes = 0;
 
     int x_total = x_dim + 2;
@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     }
 
     // print_x(x, curr_time);
-    // output_to_file(x, 0, x_dim, y_dim);
+    output_to_file(x, 0, x_dim, y_dim);
 
     double sx = (alpha * dt) / (dx * dx);
     double sy = (alpha * dt) / (dy * dy);
@@ -90,7 +90,9 @@ int main(int argc, char *argv[]) {
             }
         }
         curr_time += dt;
-        // output_to_file(x, k, x_dim, y_dim);
+        if (k % w_out == 0) {
+            output_to_file(x, k, x_dim, y_dim);
+        }
         if (diff < .01) {
             printf("convergence at step %d\n", k);
             break;

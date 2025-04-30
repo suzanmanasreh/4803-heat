@@ -9,7 +9,7 @@ for line in seq_file.readlines():
 
 seq = np.array(seq_nums)
 
-par_file = open("2dp/ex_0100.vtk", "r")
+par_file = open("2dpomp/ex_0100.vtk", "r")
 par_nums = []
 for line in par_file.readlines():
     if line[0].isnumeric():
