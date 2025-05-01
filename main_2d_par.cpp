@@ -43,19 +43,18 @@ int main(int argc, char *argv[]) {
     double dt = .01;
     double Lx = 1.0;
     double Ly = 1.0;
-    int x_dim = 100;
-    int y_dim = 100;
+    int x_dim = 600;
+    int y_dim = 600;
     double dx = Lx / x_dim;
     double dy = Ly / y_dim;
-    int num_steps = 5000;
+    int num_steps = 100;
     // heat coeff
     double alpha = .1;
 
-    int w_out = 100;
-    double writes = 0; // unused
+    int w_out = 200;
 
-    int x_domains = 2;
-    int y_domains = 2;
+    int x_domains = 6;
+    int y_domains = 6;
 
     int num_domains = x_domains * y_domains;
 
@@ -89,9 +88,14 @@ int main(int argc, char *argv[]) {
 
     if (dt >= max_dt) {
         if (rank == 0) {
-            printf("dt too large. setting it to max_dt: %f, dx: %f, dy: %f, min_h: %f, alpha: %f\n", max_dt, dx, dy, min_h, alpha);
+            printf("The parameter dt is too large. Setting it to max_dt: %f, dx: %f, dy: %f, min_h: %f, alpha: %f\n", max_dt, dx, dy, min_h, alpha);
         }
         dt = max_dt;
+    }
+
+    int n_threads = omp_get_max_threads();
+    if (rank == 0) {
+        printf("Using %d OpenMP threads\n", n_threads);
     }
 
 
@@ -202,6 +206,7 @@ int main(int argc, char *argv[]) {
     int k = 0;
     gather_and_output(x, comm, rank, p, x_cells, y_cells, x_domains, y_domains, x_dim, y_dim, x_start, x_end, y_start, y_end, curr_time, k);
 
+    // time stepper
     for (k = 1; k <= num_steps; k++) {
         double diff = 0;
         double global_diff = 0;
@@ -234,13 +239,11 @@ int main(int argc, char *argv[]) {
 
         MPI_Allreduce(&diff, &global_diff, 1, MPI_DOUBLE, MPI_SUM, comm);
         global_diff = sqrt(global_diff);
-        MPI_Bcast(&global_diff, 1, MPI_DOUBLE, 0, comm);
+
         if (global_diff < .01) {
             printf("rank %d convergence at step %d\n", rank, k);
             break;
-        } // else {
-        //    printf("global_diff: %f, diff: %f\n", global_diff, diff);
-        // }
+        }
     }
 
     t2 = MPI_Wtime();
@@ -300,6 +303,8 @@ void gather_and_output(arr_2d &x, MPI_Comm comm, int rank, int p, int x_cells, i
         for (idx d = 0; d < p; d++) {
             long block_x_offset = ((d % x_domains) * x_cells);
             long block_y_offset = (d / x_domains) * y_cells;
+
+            #pragma omp parallel for collapse(2)
             for (idx i = 0; i < x_cells; i++) {
                 for (idx j = 0; j < y_cells; j++) {
                     long x_idx = block_x_offset + i;
