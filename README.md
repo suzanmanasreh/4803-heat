@@ -13,3 +13,6 @@ Parameters to edit in `main_2d_par.cpp`
 - y_domains
 - dt
 - alpha
+- w_out
+- init_inner
+- init_border
